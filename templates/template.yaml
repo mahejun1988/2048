@@ -1,0 +1,112 @@
+ROSTemplateFormatVersion: '2015-09-01'
+Description:
+  en: Deploy 2048 game with one click.
+  zh-cn: 一键部署2048小游戏。
+Parameters:
+  ZoneId:
+    Type: String
+    Label:
+      en: Zone ID
+      zh-cn: 可用区ID
+    AssociationProperty: ALIYUN::ECS::Instance::ZoneId
+  EcsInstanceType:
+    Type: String
+    Label:
+      en: Instance Type
+      zh-cn: 实例类型
+    AssociationProperty: ALIYUN::ECS::Instance::InstanceType
+    AllowedValues:
+      - ecs.c6.large
+      - ecs.c6.xlarge
+Resources:
+  Vpc:
+    Type: ALIYUN::ECS::VPC
+    Properties:
+      CidrBlock: 192.168.0.0/16
+  SecurityGroup:
+    Type: ALIYUN::ECS::SecurityGroup
+    Properties:
+      VpcId:
+        Ref: Vpc
+  VSwitch:
+    Type: ALIYUN::ECS::VSwitch
+    Properties:
+      ZoneId:
+        Ref: ZoneId
+      VpcId:
+        Ref: Vpc
+      CidrBlock: 192.168.0.0/24
+  InstanceGroup:
+    Type: ALIYUN::ECS::InstanceGroup
+    Properties:
+      VpcId:
+        Ref: Vpc
+      VSwitchId:
+        Ref: VSwitch
+      SecurityGroupId:
+        Ref: SecurityGroup
+      ZoneId:
+        Ref: ZoneId
+      InstanceType:
+        Ref: EcsInstanceType
+      ImageId: centos_7_8
+      SystemDiskCategory: cloud_essd
+      IoOptimized: optimized
+      MaxAmount: 1
+  SecurityGroupIngress_80:
+    Type: ALIYUN::ECS::SecurityGroupIngress
+    Properties:
+      SecurityGroupId:
+        Ref: SecurityGroup
+      SourceCidrIp: 0.0.0.0/0
+      IpProtocol: tcp
+      NicType: intranet
+      PortRange: 80/80
+  Install_2048:
+    Type: ALIYUN::ECS::RunCommand
+    Properties:
+      InstanceIds:
+        Fn::GetAtt:
+          - InstanceGroup
+          - InstanceIds
+      Type: RunShellScript
+      Sync: true
+      Timeout: 3600
+      CommandContent:
+        Fn::Sub:
+          - |
+            #!/bin/bash
+            yum install -y httpd wget
+            systemctl start httpd
+            wget '{{ computenest::file::2048 }}' -O 2048.tgz
+            tar xvf 2048.tgz
+            sed -i 's/\${!ALI_UID}/${AccountId}/g' 2048/index.html 
+            mv 2048/* /var/www/html && rm -rf 2048
+          - AccountId:
+              Ref: ALIYUN::TenantId
+    DependsOn:
+      - SecurityGroupIngress_80
+Outputs:
+  Url:
+    Description:
+      en: 2048 Page.
+      zh-cn: 2048页面。
+    Value:
+      Fn::Sub:
+        - http://${IP}
+        - IP:
+            Fn::Jq:
+              - First
+              - .[0]
+              - Fn::GetAtt:
+                  - InstanceGroup
+                  - PublicIps
+Metadata:
+  ALIYUN::ROS::Interface:
+    ParameterGroups:
+      - Parameters:
+          - EcsInstanceType
+          - ZoneId
+        Label: 资源配置
+    TemplateTags:
+      - acs:developer:云起实验室:一键部署2048小游戏
