@@ -8,7 +8,7 @@ Service:
           ArtifactId: ${Artifact.Artifact_1.ArtifactId}
           ArtifactVersion: ${Artifact.Artifact_1.ArtifactVersion}
     TemplateConfigs:
-      - Name: 单机版
+      - Name: 单机版001
         Url: 'templates/template.yaml'
 #        TrialType: Trial
         AllowedRegions:
